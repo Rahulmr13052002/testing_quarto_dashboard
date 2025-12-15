@@ -14,20 +14,19 @@ css:
 
 ```{r}
 #load Packages
-#if(!require(pacman)) install.packages("pacman")
-pacman::p_load(tidyverse,
-               plotly,
-               reactable,
-               bslib,
-               bsicons,
-               shiny,
-               DBI,
-               RMariaDB,
-               pool,
-               scales,
-               DT,
-               htmltools
-               )
+library(tidyverse)
+library(plotly)
+library(reactable)
+library(bslib)
+library(bsicons)
+library(shiny)
+library(DBI)
+library(RMariaDB)
+library(pool)
+library(scales)
+library(DT)
+library(htmltools)
+
 ```
 
 ```{r}
