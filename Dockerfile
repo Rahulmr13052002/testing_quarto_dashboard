@@ -29,5 +29,5 @@ COPY . /app
 # ---- Expose port ----
 EXPOSE 10000
 
-# ---- Force Quarto Preview ----
+
 CMD ["quarto", "preview", "index.qmd", "--host", "0.0.0.0", "--port", "10000", "--no-browser"]
