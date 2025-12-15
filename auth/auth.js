@@ -5,8 +5,9 @@ document.addEventListener("DOMContentLoaded", async () => {
     domain: "dev-tbjltoa0gj3q6ken.us.auth0.com",
     clientId: "YZSOeNcMnGvmG07LjZFwB3yL6j3qZy9x",
     authorizationParams: {
-       //redirect_uri: "https://rahulmr13052002.github.io/testing_quarto_dashboard/"
-      redirect_uri: "https://testing-quarto-dashboard.onrender.com"
+       redirect_uri: "https://rahulmr13052002.github.io/testing_quarto_dashboard/"
+      //redirect_uri: "https://testing-quarto-dashboard.onrender.com"
+       //redirect_uri: window.location.origin
     }
   });
 
