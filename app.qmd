@@ -1,0 +1,215 @@
+---
+title: "Zukti Dashboard"
+format:
+  dashboard:
+    scrolling: true
+    theme: 
+      light: flatly
+      dark: darkly
+include-in-header:
+  - auth/header.html
+css:
+  - auth/auth.css
+---
+
+```{r}
+#load Packages
+#if(!require(pacman)) install.packages("pacman")
+pacman::p_load(tidyverse,
+               plotly,
+               reactable,
+               bslib,
+               bsicons,
+               shiny,
+               DBI,
+               RMariaDB,
+               pool,
+               scales,
+               DT,
+               htmltools
+               )
+```
+
+```{r}
+# This is For Database Connection
+
+db_name <- "store_app_dev"
+pool <- dbPool(
+  drv = RMariaDB::MariaDB(),
+  user = "rahul",
+  password = "Zukti@2025",
+  host = "49.206.25.216",
+  port = 3306,
+  dbname = db_name
+)
+
+con <- poolCheckout(pool)
+
+#To make or Switch to Current Active
+invisible(dbExecute(con, paste0("USE ", db_name)))
+
+sales_data <- dbGetQuery(con, "SELECT * FROM store_app_dev.vw_all_sales limit 50000")
+
+sales_data <- sales_data |> group_by(branch_code) |>
+  mutate(count_branch = n())
+
+
+items_data <- dbGetQuery(con,"SELECT * FROM store_app_dev.vw_all_items")
+
+items_data <- items_data |> group_by(branch_code) |> 
+mutate(count_items_by_branch = n())
+
+total_sales_All_Branch_count <- dbGetQuery(con, "SELECT count(*) FROM store_app_dev.vw_all_sales limit 50000")
+
+total_inwards_count <- dbGetQuery(con,"SELECT count(*) FROM store_app_dev.vw_all_inwards limit 50000")
+
+total_items_count <- dbGetQuery(con,"SELECT count(*) FROM store_app_dev.vw_all_items limit 50000;")
+
+poolReturn(con)
+
+```
+
+# Home
+
+## Row
+
+```{r}
+value_box(
+  title="Total Sales",
+  value=total_sales_All_Branch_count,
+  showcase=bsicons::bs_icon("cart4"),
+  theme="bg-success"
+  
+)
+```
+
+```{r}
+value_box(
+  title="Total Inwards",
+  value=total_inwards_count,
+  showcase=bsicons::bs_icon("cart-plus-fill"),
+  theme="bg-danger"
+  
+)
+```
+
+```{r}
+value_box(
+  title="Total Items",
+  value=total_items_count,
+  showcase=bsicons::bs_icon("diagram-2"),
+  theme="bg-purple"
+  
+)
+```
+
+## Row
+
+### Column 1
+
+```{r}
+sales_data_graph <- ggplot2::ggplot(data=sales_data,aes(x=branch_code,y=count_branch,fill=branch_code))+
+  geom_bar(stat="identity")+
+  theme_minimal()
+ggplotly(sales_data_graph)
+```
+
+### Column 2
+
+```{r}
+
+item_data_graph <- ggplot(
+  data = items_data,
+  aes(
+    x = branch_code,
+    y = count_items_by_branch,
+    color = branch_code
+  )
+) +
+  geom_point() 
+
+ggplotly(item_data_graph)
+
+```
+
+
+# React Table
+
+## Row 
+
+```{r}
+library(DT)
+
+datatable(
+  items_data,
+  options = list(
+    pageLength = 10,
+    autoWidth = TRUE,
+    dom = 'Bfrtip',
+    searching = TRUE,
+    paging = TRUE
+  ),
+  rownames = FALSE,
+  class = 'cell-border stripe hover',
+  filter = 'top'  # <-- enables column-wise filters
+) %>%
+  formatStyle(
+    names(items_data),
+    backgroundColor = 'white',
+    color = 'black'
+  ) %>%
+  htmltools::tagList(
+    tags$style(HTML("
+      /* Table header */
+      table.dataTable thead th {
+        background-color: white !important;
+        color: black !important;
+      }
+      table.dataTable tfoot th {
+        background-color: white !important;
+        color: black !important;
+      }
+      /* Row hover effect */
+      table.dataTable tbody tr:hover {
+        background-color: #f2f2f2 !important;
+      }
+      /* Search box */
+      .dataTables_filter input {
+        background-color: white !important;
+        color: black !important;
+      }
+      /* Page length dropdown */
+      .dataTables_length select {
+        background-color: white !important;
+        color: black !important;
+      }
+      /* Pagination buttons */
+      .dataTables_paginate .paginate_button {
+        background-color: #fbf9f9ff !important;
+        color: black !important;
+        border: 1px solid #a19e9eff !important;
+        border-radius: 3px;
+        margin: 2px;
+      }
+      .dataTables_paginate .paginate_button.current {
+        background-color: #f3eeeeff !important;
+        color: black !important;
+      }
+      .dataTables_paginate .paginate_button:hover {
+        background-color: #f1efefff !important;
+        color: black !important;
+      }
+      /* Column filter inputs */
+      table.dataTable thead input {
+        background-color: white !important;
+        color: black !important;
+        width: 100% !important;
+      }
+    "))
+  )
+
+```
+
+
+
+

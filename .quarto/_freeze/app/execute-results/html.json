@@ -1,0 +1,15 @@
+{
+  "hash": "5e9ba8e52590cfa95237e7aa64ae14f4",
+  "result": {
+    "engine": "knitr",
+    "markdown": "---\ntitle: \"Auth0 Protected Quarto Dashboard\"\nformat: \n  dashboard:\n    theme: cosmo\n    css: \n      - auth/auth.css\n    include-in-header:\n      - auth/auth.js\n---\n\n\n::: {.cell}\n\n:::\n\n\n\n::: {.cell}\n\n:::\n\n\n\n::: {.cell}\n\n:::\n\n\n\n\n::: {.cell}\n::: {.cell-output-display}\n`<div style=\"width: 100% ; height: 400px ; text-align: center; box-sizing: border-box; -moz-box-sizing: border-box; -webkit-box-sizing: border-box;\" class=\"muted well\">Shiny applications not supported in static R Markdown documents</div>`{=html}\n:::\n:::\n\n\n",
+    "supporting": [],
+    "filters": [
+      "rmarkdown/pagebreak.lua"
+    ],
+    "includes": {},
+    "engineDependencies": {},
+    "preserve": {},
+    "postProcess": true
+  }
+}
