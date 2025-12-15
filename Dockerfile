@@ -13,16 +13,25 @@ RUN wget -q https://github.com/quarto-dev/quarto-cli/releases/download/v1.5.55/q
     && dpkg -i quarto-1.5.55-linux-amd64.deb \
     && rm quarto-1.5.55-linux-amd64.deb
 
-# ---- Install additional R packages ----
+# ---- Install ALL required R packages ----
 RUN R -e "install.packages(c( \
-    'DBI','RMariaDB','pool','reactable','bslib','bsicons','DT','scales','htmltools' \
+    'plotly', \
+    'reactable', \
+    'bslib', \
+    'bsicons', \
+    'DBI', \
+    'RMariaDB', \
+    'pool', \
+    'DT', \
+    'scales', \
+    'htmltools' \
 ), repos='https://cloud.r-project.org')"
 
-# ---- Set working directory and copy app ----
+# ---- App directory ----
 WORKDIR /app
 COPY . /app
 
-# ---- Expose port for Render ----
+# ---- Expose Render port ----
 EXPOSE 10000
 
 # ---- Start Quarto Preview ----
