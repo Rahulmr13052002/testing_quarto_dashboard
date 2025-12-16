@@ -1,6 +1,3 @@
-# ==================================
-# Quarto Auto Renderer (Windows Safe)
-# ==================================
 
 PROJECT_DIR <- "C:/Users/HP/OneDrive/Documents/quarto-auth0-dashboard"
 setwd(PROJECT_DIR)
