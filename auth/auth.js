@@ -7,66 +7,50 @@ document.addEventListener("DOMContentLoaded", async () => {
       clientId: "YZSOeNcMnGvmG07LjZFwB3yL6j3qZy9x",
       authorizationParams: {
         redirect_uri: "https://rahulmr13052002.github.io/testing_quarto_dashboard/"
-        // redirect_uri: window.location.origin
       }
     });
 
     console.log("✅ Auth0 client initialized");
 
-    // Handle login redirect
     if (
       window.location.search.includes("code=") &&
       window.location.search.includes("state=")
     ) {
-      console.log("🔁 Handling Auth0 redirect callback...");
+      console.log("🔁 Handling redirect callback");
       await auth0Client.handleRedirectCallback();
       window.history.replaceState({}, document.title, window.location.pathname);
-      console.log("✅ Redirect callback handled");
+      console.log("✅ Redirect handled");
     }
 
     const isAuthenticated = await auth0Client.isAuthenticated();
     console.log("🔐 isAuthenticated:", isAuthenticated);
 
     if (!isAuthenticated) {
-      console.log("➡️ User not authenticated. Redirecting to login...");
+      console.log("➡️ Redirecting to Auth0 login");
       await auth0Client.loginWithRedirect();
       return;
     }
 
-    // ✅ USER IS LOGGED IN HERE
-    console.log("🎉 User successfully logged in");
+    console.log("🎉 Login successfulja success");
 
-    // Show dashboard content
     document.getElementById("content").style.display = "block";
     document.getElementById("topbar").style.display = "flex";
 
-    // Get user info
     const user = await auth0Client.getUser();
-    console.log("👤 Auth0 User Info:", user);
+    console.log("👤 User info:", user);
 
-    if (user) {
-      console.log("📧 Email:", user.email);
-      console.log("🆔 Sub:", user.sub);
-      console.log("🖼 Picture:", user.picture);
-      console.log("🕒 Updated At:", user.updated_at);
-    }
+    document.getElementById("username").textContent =
+      user.name || user.email || "User";
 
-    if (document.getElementById("username")) {
-      document.getElementById("username").textContent =
-        user.name || user.email || "User";
-    }
-
-    // Logout
     document.getElementById("logoutBtn").onclick = () => {
-      console.log("🚪 Logging out user...");
       auth0Client.logout({
         logoutParams: {
-          returnTo: window.location.origin
+          returnTo: "https://rahulmr13052002.github.io/testing_quarto_dashboard/"
         }
       });
     };
 
-  } catch (error) {
-    console.error("❌ Auth0 Error:", error);
+  } catch (err) {
+    console.error("❌ Auth0 fatal error:", err);
   }
 });
