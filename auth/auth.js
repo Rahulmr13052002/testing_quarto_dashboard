@@ -2,6 +2,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   try {
     console.log("🚀 Auth script loaded");
 
+    // ✅ Dynamic redirect URI (works for localhost, GitHub Pages, Render)
     const redirectUri =
       window.location.origin + window.location.pathname;
 
@@ -11,7 +12,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       authorizationParams: {
         redirect_uri: redirectUri
       },
-      cacheLocation: "localstorage", // IMPORTANT for GitHub Pages
+      cacheLocation: "localstorage", // REQUIRED for GitHub Pages
       useRefreshTokens: true
     });
 
@@ -31,37 +32,55 @@ document.addEventListener("DOMContentLoaded", async () => {
     const isAuthenticated = await auth0Client.isAuthenticated();
     console.log("🔐 isAuthenticated:", isAuthenticated);
 
-    // 🚪 Not logged in → redirect to login
+    // 🚪 Not authenticated → login
     if (!isAuthenticated) {
       console.log("➡️ Redirecting to Auth0 login...");
       await auth0Client.loginWithRedirect();
       return;
     }
 
-    // 🎉 Logged in
+    // 🎉 Authenticated
     console.log("🎉 Login successful");
 
-    // Show dashboard
-    document.getElementById("content").style.display = "block";
-    document.getElementById("topbar").style.display = "flex";
+    // 🧱 SAFE DOM ACCESS
+    const content = document.getElementById("content");
+    const topbar = document.getElementById("topbar");
+    const usernameEl = document.getElementById("username");
+    const logoutBtn = document.getElementById("logoutBtn");
+
+    if (content) {
+      content.style.display = "block";
+    } else {
+      console.warn("⚠️ #content element not found");
+    }
+
+    if (topbar) {
+      topbar.style.display = "flex";
+    } else {
+      console.warn("⚠️ #topbar element not found");
+    }
 
     // 👤 User info
     const user = await auth0Client.getUser();
     console.log("👤 User info:", user);
 
-    if (user && document.getElementById("username")) {
-      document.getElementById("username").textContent =
-        user.name || user.email || "User";
+    if (user && usernameEl) {
+      usernameEl.textContent = user.name || user.email || "User";
     }
 
     // 🚪 Logout
-    document.getElementById("logoutBtn").onclick = () => {
-      auth0Client.logout({
-        logoutParams: {
-          returnTo: redirectUri
-        }
-      });
-    };
+    if (logoutBtn) {
+      logoutBtn.onclick = () => {
+        console.log("🚪 Logging out...");
+        auth0Client.logout({
+          logoutParams: {
+            returnTo: redirectUri
+          }
+        });
+      };
+    } else {
+      console.warn("⚠️ #logoutBtn not found");
+    }
 
   } catch (err) {
     console.error("❌ Auth0 fatal error:", err);
