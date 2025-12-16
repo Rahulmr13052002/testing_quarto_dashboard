@@ -12,6 +12,23 @@ css:
   - auth/auth.css
 ---
 
+<!-- 🔐 AUTH0 TOP BAR -->
+<div id="topbar"
+     style="display:none;
+            justify-content:flex-end;
+            align-items:center;
+            gap:12px;
+            padding:10px 16px;
+            background:#f8f9fa;
+            border-bottom:1px solid #ddd;">
+  Welcome, <strong><span id="username">User</span></strong>
+  <button id="logoutBtn" class="btn btn-sm btn-outline-danger">
+    Logout
+  </button>
+</div>
+
+<!-- 🔒 PROTECTED CONTENT -->
+<div id="content" style="display:none;">
 
 ```{r}
 #load Packages
@@ -210,6 +227,7 @@ datatable(
 
 ```
 
+</div>
 
 
 

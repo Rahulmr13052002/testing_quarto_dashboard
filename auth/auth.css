@@ -1,3 +1,7 @@
-#auth-box {
-  z-index: 9999;
+body {
+  visibility: hidden;
+}
+
+body.authenticated {
+  visibility: visible;
 }
