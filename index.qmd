@@ -14,7 +14,7 @@ css:
 
 <!-- 🔐 AUTH0 TOP BAR -->
 <div id="topbar"
-     style="display:none;
+     style="display:none;margin-bottom:10px;
             justify-content:flex-end;
             align-items:center;
             gap:12px;
