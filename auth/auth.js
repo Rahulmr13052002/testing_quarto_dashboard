@@ -1,23 +1,20 @@
 document.addEventListener("DOMContentLoaded", async () => {
 
-  // Initialize Auth0
   const auth0Client = await auth0.createAuth0Client({
     domain: "dev-tbjltoa0gj3q6ken.us.auth0.com",
     clientId: "YZSOeNcMnGvmG07LjZFwB3yL6j3qZy9x",
     authorizationParams: {
-       redirect_uri: "https://rahulmr13052002.github.io/testing_quarto_dashboard/"
-      //redirect_uri: "https://testing-quarto-dashboard.onrender.com"
-       //redirect_uri: window.location.origin
+      //redirect_uri: "https://rahulmr13052002.github.io/testing_quarto_dashboard/"
+      redirect_uri: window.location.origin
     }
   });
 
-  // Handle redirect after login
+  // Handle login redirect
   if (location.search.includes("code=") && location.search.includes("state=")) {
     await auth0Client.handleRedirectCallback();
     window.history.replaceState({}, document.title, window.location.pathname);
   }
 
-  // Check login status
   const isAuthenticated = await auth0Client.isAuthenticated();
 
   if (!isAuthenticated) {
@@ -25,24 +22,25 @@ document.addEventListener("DOMContentLoaded", async () => {
     return;
   }
 
-  // Show dashboard
+  // ✅ Show dashboard content
   document.getElementById("content").style.display = "block";
+  document.getElementById("topbar").style.display = "flex";
 
-  // Get user details
+  // ✅ Get user info
   const user = await auth0Client.getUser();
 
-  // Display username
   if (document.getElementById("username")) {
-    console.log(user.name,user.email)
-    document.getElementById("username").textContent = user.name || user.email;
+    document.getElementById("username").textContent =
+      user.name || user.email || "User";
   }
 
   // Logout
-  if (document.getElementById("logoutBtn")) {
-    document.getElementById("logoutBtn").addEventListener("click", () => {
-      auth0Client.logout({
-        logoutParams: { returnTo: window.location.origin }
-      });
+  document.getElementById("logoutBtn").onclick = () => {
+    auth0Client.logout({
+      logoutParams: {
+        returnTo: window.location.origin
+      }
     });
-  }
+  };
+
 });
