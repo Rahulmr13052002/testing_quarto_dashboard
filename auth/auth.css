@@ -6,20 +6,3 @@ body.authenticated {
   visibility: visible;
 }
 
-#topbar {
-  display: none;                 /* controlled by auth.js */
-  justify-content: space-between; /* 👈 LEFT & RIGHT */
-  align-items: center;
-  padding: 10px 16px;
-  background: #f8f9fa;
-  border-bottom: 1px solid #ddd;
-}
-
-#welcomeText {
-  font-size: 14px;
-  color: #333;
-}
-
-#logoutBtn {
-  white-space: nowrap;
-}
