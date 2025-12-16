@@ -8,7 +8,8 @@
 PROJECT_DIR <- "C:/Users/HP/OneDrive/Documents/quarto-auth0-dashboard"
 setwd(PROJECT_DIR)
 
-QUARTO <- '"C:/Program Files/Quarto/bin/quarto.exe"'
+# Correct Quarto path
+QUARTO <- '"C:/Users/HP/AppData/Local/Programs/Quarto/bin/quarto.exe"'  # update this to your Quarto path
 LOG_FILE <- file.path(PROJECT_DIR, "dashboard_service.log")
 
 # -------------------------
@@ -32,26 +33,34 @@ system('git config user.email "rahulmrrahulmr27@gmail.com"')
 repeat {
   log_msg("==== Cycle Started ====")
   
+  # ---- Check if Quarto exists ----
+  if (!file.exists(gsub('"','',QUARTO))) {
+    log_msg(paste0("❌ Quarto executable not found at: ", gsub('"','',QUARTO)))
+    Sys.sleep(120)
+    next
+  }
+  
   # ---- Render Quarto Dashboard ----
   render_output <- tryCatch({
-    system(paste(QUARTO, "render index.qmd"), intern = TRUE, ignore.stderr = FALSE)
-  }, error = function(e) {
-    e$message
-  })
+    system(paste(QUARTO, "render index.qmd 2>&1"), intern = TRUE)
+  }, error = function(e) e$message)
   
-  if (any(grepl("Error", render_output, ignore.case = TRUE))) {
-    log_msg("❌ Quarto render ERROR detected:")
-    log_msg(paste(render_output, collapse = " | "))
-    log_msg("Skipping Git push for this cycle.")
+  # Log Quarto output
+  log_msg("---- Quarto Output Start ----")
+  log_msg(paste(render_output, collapse = "\n"))
+  log_msg("---- Quarto Output End ----")
+  
+  # ---- Check for errors ----
+  if (any(grepl("error|failed|not found", render_output, ignore.case = TRUE))) {
+    log_msg("❌ Quarto render FAILED. Skipping Git push for this cycle.")
     Sys.sleep(120)
     next
   }
   
   log_msg("✅ Quarto render SUCCESS")
-  log_msg(paste(render_output, collapse = " | "))
   
-  # ---- Check for changes ----
-  git_status <- system("git status --porcelain", intern = TRUE)
+  # ---- Check for Git changes ----
+  git_status <- system("git status --porcelain 2>&1", intern = TRUE)
   
   if (length(git_status) == 0) {
     log_msg("ℹ️ No changes detected. Nothing to commit.")
@@ -59,21 +68,23 @@ repeat {
     next
   }
   
-  # ---- Commit & Push ----
-  git_add <- system("git add .", intern = TRUE)
-  log_msg(paste(git_add, collapse = " | "))
+  # ---- Git Add ----
+  git_add <- system("git add . 2>&1", intern = TRUE)
+  log_msg(paste("Git Add Output:", paste(git_add, collapse = "\n")))
   
+  # ---- Git Commit ----
   git_commit <- tryCatch({
-    system('git commit -m "Auto update dashboard"', intern = TRUE)
+    system('git commit -m "Auto update dashboard" 2>&1', intern = TRUE)
   }, error = function(e) e$message)
-  log_msg(paste(git_commit, collapse = " | "))
+  log_msg(paste("Git Commit Output:", paste(git_commit, collapse = "\n")))
   
+  # ---- Git Push ----
   git_push <- tryCatch({
-    system("git push origin main", intern = TRUE)
+    system("git push origin main 2>&1", intern = TRUE)
   }, error = function(e) e$message)
-  log_msg(paste(git_push, collapse = " | "))
+  log_msg(paste("Git Push Output:", paste(git_push, collapse = "\n")))
   
-  log_msg("🚀 Git push completed")
+  log_msg("🚀 Git push cycle completed")
   
   # ---- Sleep for 2 minutes ----
   log_msg("Sleeping for 2 minutes\n")
