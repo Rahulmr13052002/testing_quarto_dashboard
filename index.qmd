@@ -452,6 +452,32 @@ library(dplyr)
 library(stringr)
 library(htmltools)
 library(htmlwidgets)
+library(readr)
+
+report_date_fmt <- format(as.Date(report_date), "%d-%b-%Y")
+
+# Indian Rupee Formatter
+
+format_inr <- function(x) {
+  x <- as.numeric(x)
+
+  ifelse(
+    is.na(x),
+    "-",
+    {
+      s <- as.character(round(x))
+      last3 <- substr(s, nchar(s) - 2, nchar(s))
+      rest  <- substr(s, 1, nchar(s) - 3)
+
+      ifelse(
+        nchar(rest) > 0,
+        paste0(gsub("(\\d)(?=(\\d{2})+$)", "\\1,", rest, perl = TRUE), ",", last3),
+        last3
+      )
+    }
+  )
+}
+
 
 bank_table <- tribble(
   ~`Bank Name`,            ~`Account No`,          ~Status,    ~`Balance as per Books`, ~`Cheque issued but not yet presented`, ~`Cheques Received but not yet deposited`, ~`Balance as per Bank`,
@@ -467,20 +493,46 @@ bank_table <- tribble(
   "Bank of Baroda OD",     "OD",                   "Inactive",  "-",                      "-", "-", "-",
 )
 
+# Numeric Conversion
 
-bank_table_clean <- bank_table %>%
+bank_table_num <- bank_table %>%
   mutate(
-    books_num = parse_number(`Balance as per Books`),
-    bank_num  = parse_number(`Balance as per Bank`),
-    cheque_not_yet_recived_num = parse_number(`Cheque issued but not yet presented`),
-    cheque_not_yet_recived_num = parse_number(`Cheques Received but not yet deposited`)
+    books_num    = parse_number(`Balance as per Books`),
+    issued_num   = parse_number(`Cheque issued but not yet presented`),
+    received_num = parse_number(`Cheques Received but not yet deposited`),
+    bank_num     = parse_number(`Balance as per Bank`)
   )
 
-books_sum <- sum(bank_table_clean$books_num, na.rm = TRUE)
-bank_sum  <- sum(bank_table_clean$bank_num, na.rm = TRUE)
+# Column Totals
+
+books_sum    <- sum(bank_table_num$books_num, na.rm = TRUE)
+issued_sum   <- sum(bank_table_num$issued_num, na.rm = TRUE)
+received_sum <- sum(bank_table_num$received_num, na.rm = TRUE)
+bank_sum     <- sum(bank_table_num$bank_num, na.rm = TRUE)
+
+
+# Display Table (Indian Format)
+
+bank_table_display <- bank_table_num %>%
+  mutate(
+    `Balance as per Books` =
+      format_inr(books_num),
+
+    `Cheque issued but not yet presented` =
+      format_inr(issued_num),
+
+    `Cheques Received but not yet deposited` =
+      format_inr(received_num),
+
+    `Balance as per Bank` =
+      format_inr(bank_num)
+  ) %>%
+  select(-books_num, -issued_num, -received_num, -bank_num)
+
+
 
 reactable(
-  bank_table,
+  bank_table_display,
   searchable = TRUE,
   defaultPageSize = 10,
   striped = TRUE,
@@ -489,16 +541,26 @@ reactable(
   elementId = "bank_reco_table",
 
   columns = list(
-    `Bank Name` = colDef(footer = "Total Current Balance"),
+    `Bank Name` = colDef(footer = "Total"),
 
     `Balance as per Books` = colDef(
       align = "right",
-      footer = paste0("₹ ", format(books_sum, big.mark = ","))
+      footer = paste0("₹ ", format_inr(books_sum))
+    ),
+
+    `Cheque issued but not yet presented` = colDef(
+      align = "right",
+      footer = paste0("₹ ", format_inr(issued_sum))
+    ),
+
+    `Cheques Received but not yet deposited` = colDef(
+      align = "right",
+      footer = paste0("₹ ", format_inr(received_sum))
     ),
 
     `Balance as per Bank` = colDef(
       align = "right",
-      footer = paste0("₹ ", format(bank_sum, big.mark = ","))
+      footer = paste0("₹ ", format_inr(bank_sum))
     )
   ),
 
@@ -518,41 +580,36 @@ reactable(
     )
   )
 ) |>
-  onRender(
-    paste0("
-      function(el) {
+onRender(
+  paste0("
+    function(el) {
 
-        /* 🔹 ADD OUTER BORDER TO TABLE */
-        const table = el.querySelector('.rt-table');
-        if (table) {
-          table.style.border = '1px solid #d1d5db';
-        }
-
-        /* 🔹 ADD REPORT TITLE BELOW SEARCH */
-        const search = el.querySelector('.rt-search');
-
-        if (search && !document.getElementById('bank-report-title')) {
-
-          const title = document.createElement('div');
-          title.id = 'bank-report-title';
-          title.innerHTML = 'Bank Reconciliation Statement as on ", report_date, "';
-
-          title.style.background = '#DCE6F1';
-          title.style.padding = '10px';
-          title.style.textAlign = 'center';
-          title.style.fontWeight = 'bold';
-          title.style.fontSize = '1rem';
-          title.style.border = '1px solid #d1d5db';
-          title.style.borderBottom = 'none';
-          title.style.marginTop = '8px';
-
-          search.parentNode.insertBefore(title, search.nextSibling);
-        }
+      const table = el.querySelector('.rt-table');
+      if (table) {
+        table.style.border = '1px solid #d1d5db';
       }
-    ")
-  )
 
+      const search = el.querySelector('.rt-search');
+      if (search && !document.getElementById('bank-report-title')) {
 
+        const title = document.createElement('div');
+        title.id = 'bank-report-title';
+        title.innerHTML = 'Bank Reconciliation Statement as on ", report_date_fmt, "';
+
+        title.style.background = '#DCE6F1';
+        title.style.padding = '10px';
+        title.style.textAlign = 'center';
+        title.style.fontWeight = 'bold';
+        title.style.fontSize = '1.1rem';
+        title.style.border = '1px solid #d1d5db';
+        title.style.borderBottom = 'none';
+        title.style.marginTop = '8px';
+
+        search.parentNode.insertBefore(title, search.nextSibling);
+      }
+    }
+  ")
+)
 
 ```
 
@@ -561,6 +618,7 @@ reactable(
 ```{r, results='asis'}
  library(reactable)
 library(dplyr)
+library(htmlwidgets)
 
 collections_final <- collections %>%
   rename(
@@ -578,29 +636,38 @@ reactable(
   searchable = TRUE,
   resizable = TRUE,
   wrap = FALSE,
-  striped = TRUE,   # keep striped but override color
+  striped = TRUE,
   bordered = TRUE,
   elementId = "collections_table",
 
-  # 🔹 Pagination settings
-  defaultPageSize = 10,           # show 10 rows per page
-  showPageSizeOptions = TRUE,     # allow user to change page size
+  defaultPageSize = 10,
+  showPageSizeOptions = TRUE,
   pageSizeOptions = c(10, 25, 50),
 
   columns = list(
+
     `Party Name` = colDef(
       footer = "Total",
-      footerStyle = list(fontWeight = "bold")
+      footerStyle = list(
+        fontWeight = "bold",
+        textAlign = "left"
+      )
     ),
 
     Amount = colDef(
       align = "right",
-      format = colFormat(digits = 2, separators = TRUE),
-      footer = format(
-        total_amount,
-        big.mark = ",",
-        nsmall = 2
+
+      format = colFormat(
+        digits = 2,
+        separators = TRUE,
+        locales = "en-IN"
       ),
+
+      footer = JS(sprintf(
+        "new Intl.NumberFormat('en-IN', { minimumFractionDigits: 2 }).format(%f)",
+        total_amount
+      )),
+
       footerStyle = list(
         fontWeight = "bold",
         textAlign = "right"
@@ -608,12 +675,11 @@ reactable(
     )
   ),
 
-  # 🔹 Force body rows to white
-  rowStyle = JS("function(rowInfo) {
-    return {
-      backgroundColor: '#ffffff'
-    };
-  }"),
+  rowStyle = JS("
+    function(rowInfo) {
+      return { backgroundColor: '#ffffff' };
+    }
+  "),
 
   theme = reactableTheme(
     headerStyle = list(
@@ -628,6 +694,38 @@ reactable(
       borderTop = '2px solid #111827'
     )
   )
+) |>
+onRender(
+  paste0("
+    function(el) {
+
+      const table = el.querySelector('.rt-table');
+      if (table) {
+        table.style.border = '1px solid #d1d5db';
+      }
+
+      
+      const search = el.querySelector('.rt-search');
+
+      if (search && !document.getElementById('collections-report-title')) {
+
+        const title = document.createElement('div');
+        title.id = 'collections-report-title';
+        title.innerHTML = 'Collections Report as on ", report_date_fmt, "';
+
+        title.style.background = '#DCE6F1';
+        title.style.padding = '10px';
+        title.style.textAlign = 'center';
+        title.style.fontWeight = 'bold';
+        title.style.fontSize = '1.1rem';
+        title.style.border = '1px solid #d1d5db';
+        title.style.borderBottom = 'none';
+        title.style.marginTop = '8px';
+
+        search.parentNode.insertBefore(title, search.nextSibling);
+      }
+    }
+  ")
 )
 
 
@@ -638,11 +736,8 @@ reactable(
 ```{r, results='asis'}
 library(reactable)
 library(dplyr)
+library(htmlwidgets)
 
-# Total Amount for footer
-amount_total <- sum(payables$net_amount, na.rm = TRUE)
-
-# Rename columns
 payables_final <- payables %>%
   rename(
     Date = date,
@@ -651,6 +746,8 @@ payables_final <- payables %>%
     `Party Name` = ledger_name,
     Amount = net_amount
   )
+
+amount_total <- sum(payables_final$Amount, na.rm = TRUE)
 
 reactable(
   payables_final,
@@ -661,23 +758,34 @@ reactable(
   bordered = TRUE,
   elementId = "payments_table",
 
-  # 🔹 Pagination
   defaultPageSize = 10,
   showPageSizeOptions = TRUE,
   pageSizeOptions = c(10, 25, 50),
 
   columns = list(
+
     `Party Name` = colDef(
       footer = "Total",
-      footerStyle = list(fontWeight = "bold")
+      footerStyle = list(
+        fontWeight = "bold",
+        textAlign = "left"
+      )
     ),
 
     Amount = colDef(
       align = "right",
-      format = colFormat(digits = 2, separators = TRUE),
-      footer = function() {
-        paste0("₹ ", format(amount_total, big.mark = ","))
-      },
+
+      format = colFormat(
+        digits = 2,
+        separators = TRUE,
+        locales = "en-IN"
+      ),
+
+      footer = JS(sprintf(
+        "new Intl.NumberFormat('en-IN', { minimumFractionDigits: 2 }).format(%f)",
+        amount_total
+      )),
+
       footerStyle = list(
         fontWeight = "bold",
         textAlign = "right"
@@ -685,24 +793,59 @@ reactable(
     )
   ),
 
-  # 🔹 White background for rows
-  rowStyle = JS("function(rowInfo) {
-    return { backgroundColor: '#ffffff' };
-  }"),
+  rowStyle = JS("
+    function(rowInfo) {
+      return { backgroundColor: '#ffffff' };
+    }
+  "),
 
   theme = reactableTheme(
     headerStyle = list(
-      backgroundColor = "#DCE6F1",
-      color = "#111827",
-      fontWeight = "bold",
-      textAlign = "center"
+      backgroundColor = '#DCE6F1',
+      color = '#111827',
+      fontWeight = 'bold',
+      textAlign = 'center'
     ),
     footerStyle = list(
-      backgroundColor = "#DCE6F1",
-      borderTop = "2px solid #111827"
+      backgroundColor = '#DCE6F1',
+      fontWeight = 'bold',
+      borderTop = '2px solid #111827'
     ),
     stripedColor = "#ffffff"
   )
+) |>
+onRender(
+  paste0("
+    function(el) {
+
+      /* ADD OUTER BORDER */
+      const table = el.querySelector('.rt-table');
+      if (table) {
+        table.style.border = '1px solid #d1d5db';
+      }
+
+      /* ADD TITLE BELOW SEARCH */
+      const search = el.querySelector('.rt-search');
+
+      if (search && !document.getElementById('payments-report-title')) {
+
+        const title = document.createElement('div');
+        title.id = 'payments-report-title';
+        title.innerHTML = 'Payments Report as on ", report_date_fmt, "';
+
+        title.style.background = '#DCE6F1';
+        title.style.padding = '10px';
+        title.style.textAlign = 'center';
+        title.style.fontWeight = 'bold';
+        title.style.fontSize = '1.1rem';
+        title.style.border = '1px solid #d1d5db';
+        title.style.borderBottom = 'none';
+        title.style.marginTop = '8px';
+
+        search.parentNode.insertBefore(title, search.nextSibling);
+      }
+    }
+  ")
 )
 
 
