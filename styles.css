@@ -1,0 +1,46 @@
+
+.value-box {
+  padding: 4px 8px !important;
+  height: 100px !important;    
+  border-radius: 6px;
+}
+
+
+.value-box-body {
+  gap: 6px !important;
+  align-items: center !important;
+  padding: 0 !important;
+}
+
+.value-box-title {
+  font-size: 0.9rem !important;
+  font-weight: 600;
+  margin: 0 !important;
+  line-height: 1.1;
+}
+
+.value-box-value {
+  font-size: 1.5rem !important;
+  font-weight: 900;
+  line-height: 1.1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.value-box-showcase,
+.value-box .fs-1,
+.value-box .fs-2,
+.value-box .fs-3 {
+  font-size: 0.9rem !important;
+  line-height: 1 !important;
+  margin: 0 !important;
+}
+
+.value-box > .card,
+.value-box > .card-body {
+  min-height: unset !important;
+  height: auto !important;
+  padding: 0 !important;
+}
+

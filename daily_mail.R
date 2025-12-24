@@ -4,7 +4,7 @@ library(glue)
 smtp_user <- "rahulmrrahulmr27@gmail.com"       # your sender email
 smtp_password <- "uumx szxe nqqz umex"      # normal password / app password
 smtp_host <- "smtp.gmail.com"            # SMTP server (Gmail, Office, custom)
-smtp_port <- 587                            # usually 587 for TLS
+smtp_port <- 587                           # usually 587 for TLS
 
 recipients <- c("rahul@zukti.tech", "mrr36144@gmail.com")
 daily_link <- "https://rahulmr13052002.github.io/testing_quarto_dashboard/"

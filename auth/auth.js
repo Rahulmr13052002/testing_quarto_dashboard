@@ -1,93 +1,85 @@
 document.addEventListener("DOMContentLoaded", async () => {
   try {
-    console.log("🚀 Auth script loaded");
+    const redirectUri = window.location.origin + window.location.pathname;
 
-    // ✅ Dynamic redirect URI (works everywhere)
-    const redirectUri =
-      window.location.origin + window.location.pathname;
-
-    // ✅ Create Auth0 client (SPA safe config)
     const auth0Client = await auth0.createAuth0Client({
       domain: "dev-tbjltoa0gj3q6ken.us.auth0.com",
       clientId: "YZSOeNcMnGvmG07LjZFwB3yL6j3qZy9x",
       authorizationParams: {
         redirect_uri: redirectUri
       },
-      cacheLocation: "localstorage", // REQUIRED for GitHub Pages
+      cacheLocation: "localstorage",
       useRefreshTokens: true
     });
 
-    console.log("✅ Auth0 client initialized");
-
-    // 🔁 Handle Auth0 redirect callback
     if (
       window.location.search.includes("code=") &&
       window.location.search.includes("state=")
     ) {
-      console.log("🔁 Handling Auth0 redirect callback...");
       await auth0Client.handleRedirectCallback();
       window.history.replaceState({}, document.title, window.location.pathname);
-      console.log("✅ Redirect handled successfully");
     }
 
-    // 🔐 Check authentication
     const isAuthenticated = await auth0Client.isAuthenticated();
-    console.log("🔐 isAuthenticated:", isAuthenticated);
-
-    // 🚪 Not authenticated → redirect to login
     if (!isAuthenticated) {
-      console.log("➡️ Redirecting to Auth0 login...");
       await auth0Client.loginWithRedirect();
       return;
     }
 
-    // 🎉 Authenticated
-    console.log("🎉 Login successful");
+    const user = await auth0Client.getUser();
+    const username =  user?.name || user?.email ||user?.nickname || "User";
 
-    // ✅ UNLOCK PAGE AFTER LOGIN
     document.body.classList.add("authenticated");
 
-    // 🧱 Safe DOM access
-    const content = document.getElementById("content");
-    const topbar = document.getElementById("topbar");
-    const usernameEl = document.getElementById("username");
-    const logoutBtn = document.getElementById("logoutBtn");
-
-    if (content) {
-      content.style.display = "block";
-    } else {
-      console.warn("⚠️ #content element not found");
-    }
-
-    if (topbar) {
-      topbar.style.display = "flex";
-    } else {
-      console.warn("⚠️ #topbar element not found");
-    }
-
-    // 👤 Get user info
-    const user = await auth0Client.getUser();
-    console.log("👤 Auth0 User Info:", user);
-
-    if (user && usernameEl) {
-      usernameEl.textContent = user.name || user.email || "User";
-    }
-
-    // 🚪 Logout handler
-    if (logoutBtn) {
-      logoutBtn.onclick = () => {
-        console.log("🚪 Logging out...");
-        auth0Client.logout({
-          logoutParams: {
-            returnTo: redirectUri
+    const waitForNavbar = () =>
+      new Promise((resolve) => {
+        const interval = setInterval(() => {
+          const navbar = document.querySelector(".navbar") || document.querySelector(".quarto-dashboard-header");
+          if (navbar) {
+            clearInterval(interval);
+            resolve(navbar);
           }
-        });
-      };
-    } else {
-      console.warn("⚠️ #logoutBtn not found");
-    }
+        }, 200);
+      });
+
+    const navbar = await waitForNavbar();
+    if (document.getElementById("auth-user-menu")) return;
+
+    let rightWrapper = document.createElement("div");
+    rightWrapper.id = "auth-user-menu";
+    rightWrapper.style.marginLeft = "auto";
+    rightWrapper.className = "d-flex align-items-center";
+    
+    rightWrapper.innerHTML = `
+      <div class="dropdown">
+        <a class="nav-link dropdown-toggle d-flex align-items-center" style="font-weight:500;color: #d1e6dcff;margin-right:15px;"
+           href="#"
+           role="button"
+           data-bs-toggle="dropdown"
+           aria-expanded="false">
+           <i class="fas fa-user-circle me-1" style="font-size: 1.3rem; color: #d2d5d8ff; transition: color 0.3s;"
+   onmouseover="this.style.color='#fafaf8ff';" 
+   onmouseout="this.style.color='#d2d5d8ff';"></i>
+
+           ${username}
+        </a>
+        <ul class="dropdown-menu dropdown-menu-end">
+          <li>
+            <button class="dropdown-item text-danger d-flex align-items-center" id="logoutBtn" style="font-weight:500;">
+              <i class="fas fa-sign-out-alt me-2"></i> Logout
+            </button>
+          </li>
+        </ul>
+      </div>
+    `;
+
+    navbar.appendChild(rightWrapper);
+
+    document.getElementById("logoutBtn").onclick = () => {
+      auth0Client.logout({ logoutParams: { returnTo: redirectUri } });
+    };
 
   } catch (err) {
-    console.error("❌ Auth0 fatal error:", err);
+    console.error("Auth0 error:", err);
   }
 });
