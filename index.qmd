@@ -1,15 +1,27 @@
 ---
-title: "Zukti Dashboard"
+title: "Bank Reconciliation Report"
+author: "Shwetha Ragothaman"
+date: today()
+
 format:
   dashboard:
     scrolling: true
-    theme: 
-      light: flatly
-      dark: darkly
+    theme: default      
+    css: styles.css     
 include-in-header:
   - auth/header.html
 css:
   - auth/auth.css
+
+params: 
+  FY: "2024-25"
+  opg_bal_icici: 20299023.21
+  opg_bal_vijaya: 10442601.66
+
+execute:
+  warning: false
+  message: false
+  echo: false
 ---
 
 <!-- 🔐 AUTH0 TOP BAR -->
@@ -30,94 +42,138 @@ css:
 <!-- 🔒 PROTECTED CONTENT -->
 <div id="content" style="display:none;" style="margin-top:10px;">
 
+
 ```{r}
-#load Packages
+#| label: load_libraries
+#| include: false
 library(tidyverse)
-library(plotly)
-library(reactable)
-library(bslib)
-library(bsicons)
-library(shiny)
 library(DBI)
-library(RMariaDB)
-library(pool)
+library(RMySQL)
+library(stringr)
+library(lubridate)
+library(tibble)
+library(dplyr)
+library(knitr)
+library(reactable)
+library(kableExtra)
+library(bsicons)
+library(bslib)
 library(scales)
-library(DT)
 library(htmltools)
+library(ggplot2)
+library(plotly)
+```
+
+```{r}
+#| warning: false
+#| include: false
+#| label: db_connection
+
+# Connect to MySQL: 
+con <- dbConnect(
+  RMySQL :: MySQL(),
+  user = "shwetha",
+  password = "Zukti@2025",
+  dbname = "tally_kalpachar",
+  host = "49.206.25.216",
+  port = 3306
+)
+```
+
+```{r}
+#| warning: FALSE
+#| label: load_data
+
+daybook <- dbGetQuery(con, 
+                      "SELECT *, credit_amount - debit_amount AS net_amount, '2025-26' as FY 
+                      FROM vw_daybook_detailed WHERE date >= '2025-04-01';")
+
 
 ```
 
 ```{r}
-# This is For Database Connection
 
-db_name <- "store_app_dev"
-pool <- dbPool(
-  drv = RMariaDB::MariaDB(),
-  user = "rahul",
-  password = "Zukti@2025",
-  host = "49.206.25.216",
-  port = 3306,
-  dbname = db_name
-)
-
-con <- poolCheckout(pool)
-
-#To make or Switch to Current Active
-invisible(dbExecute(con, paste0("USE ", db_name)))
-
-sales_data <- dbGetQuery(con, "SELECT * FROM store_app_dev.vw_all_sales limit 50000")
-
-sales_data <- sales_data |> group_by(branch_code) |>
-  mutate(count_branch = n())
+daybook <- daybook |>
+  mutate(narr_short = str_sub(narration, 1, 25))
+      
+```
 
 
-items_data <- dbGetQuery(con,"SELECT * FROM store_app_dev.vw_all_items")
 
-items_data <- items_data |> group_by(branch_code) |> 
-mutate(count_items_by_branch = n())
+```{r}
 
-total_sales_All_Branch_count <- dbGetQuery(con, "SELECT count(*) FROM store_app_dev.vw_all_sales limit 50000")
-
-total_inwards_count <- dbGetQuery(con,"SELECT count(*) FROM store_app_dev.vw_all_inwards limit 50000")
-
-total_items_count <- dbGetQuery(con,"SELECT count(*) FROM store_app_dev.vw_all_items limit 50000;")
-
-poolReturn(con)
+report_date <- as.Date("2025-12-10")
+collections <- daybook %>%
+  filter(voucher_type == "Receipt_New",
+         date == report_date,
+         net_amount < 0) %>%
+  select(date, voucher_type, ledger_name, narr_short, net_amount)
+payables <- daybook %>%
+  filter(voucher_type== "Payment_New",
+         date == report_date,
+         net_amount > 0) %>%
+  select(date, voucher_type, ledger_name, narr_short, net_amount)
 
 ```
 
-# Home
+# BRS
+
+
+
+```{r}
+icici_books <- daybook |> 
+  filter(ledger_name == "11101004 - ICICI bank-281305008509") |> 
+  group_by(m = month(date)) |> 
+  summarise(bal = sum(net_amount, na.rm = TRUE)) %>%
+  rbind(data.frame(m = 0, bal = params$opg_bal_icici),.) |>  
+  mutate(closing_bal = cumsum(bal)) %>%
+  pull(closing_bal) |> 
+  tail(1)
+
+vijaya_books <- daybook |> 
+  filter(ledger_name == "11101002 -   VIjaya Bank -100800301000084") |> 
+  group_by(m = month(date)) |> 
+  summarise(bal = sum(net_amount, na.rm = TRUE)) %>%
+  rbind(data.frame(m = 0, bal = params$opg_bal_vijaya),.) |>  
+  mutate(closing_bal = cumsum(bal)) %>%
+  pull(closing_bal) |> 
+  tail(1)
+
+
+```
 
 ## Row
-
 ```{r}
-value_box(
-  title="Total Sales",
-  value=total_sales_All_Branch_count,
-  showcase=bsicons::bs_icon("cart4"),
-  theme="bg-success"
-  
-)
-```
+# Sample calculations
+total_collections <- sum(collections$net_amount, na.rm = TRUE) * -1
+total_payments    <- sum(payables$net_amount, na.rm = TRUE)
+# Closing balances including all transactions
 
-```{r}
-value_box(
-  title="Total Inwards",
-  value=total_inwards_count,
-  showcase=bsicons::bs_icon("cart-plus-fill"),
-  theme="bg-danger"
-  
-)
-```
+#For ICICI Opening Balance
+opening_icici <- params$opg_bal_icici
 
-```{r}
-value_box(
-  title="Total Items",
-  value=total_items_count,
-  showcase=bsicons::bs_icon("diagram-2"),
-  theme="bg-purple"
-  
-)
+#This For ICICI Bank Transaction sum
+txn_icici <- daybook |>
+  filter(ledger_name == "11101004 - ICICI bank-281305008509") |>
+  summarise(total = sum(net_amount, na.rm = TRUE)) |>
+  pull(total)
+
+# Final ICIC Closing Balance
+closing_icici <- opening_icici + txn_icici
+
+
+#For Vijaya Opening Balance
+opening_vijaya <- params$opg_bal_vijaya
+
+#This For Vijaya Bank Transaction sum
+txn_vijaya <- daybook |>
+  filter(ledger_name == "11101002 -   VIjaya Bank -100800301000084") |>
+  summarise(total = sum(net_amount, na.rm = TRUE)) |>
+  pull(total)
+
+# Final Vijaya Closing Balance
+closing_vijaya <- opening_vijaya + txn_vijaya
+
 ```
 
 ## Row
@@ -125,109 +181,539 @@ value_box(
 ### Column 1
 
 ```{r}
-sales_data_graph <- ggplot2::ggplot(data=sales_data,aes(x=branch_code,y=count_branch,fill=branch_code))+
-  geom_bar(stat="identity")+
-  theme_minimal()
-ggplotly(sales_data_graph)
+# Total Collections Card
+  value_box(
+    title = tags$span(style="font-size:0.7rem;", "Total Collections"),
+    value = tags$span(style="font-size:0.9rem;", paste0("₹ ", comma(total_collections))),
+    showcase = bs_icon("cash-stack", size="1em"),
+    theme = "primary",
+    showcase_layout = "left center"
+  )
+
+  # ICICI Balance Card
+  tags$div(
+  `data-bs-toggle` = "tooltip",
+  `data-bs-placement` = "right",
+  title = paste0(
+    "Opening Balance : ₹ ", comma(opening_icici), "\n",
+    "Net Transactions : ₹ ", comma(txn_icici), "\n",
+    "-------------------------\n",
+    "Closing Balance : ₹ ", comma(icici_books)
+  ),
+  style = "cursor: help;",
+
+  value_box(
+    title = tags$span(style="font-size:0.7rem;", "ICICI Balance"),
+    value = tags$span(style="font-size:0.9rem;", paste0("₹ ", comma(icici_books))),
+    showcase = bs_icon("bank", size="1em"),
+    theme = "success",
+    showcase_layout = "left center"
+  )
+)
+
 ```
 
 ### Column 2
 
 ```{r}
-
-item_data_graph <- ggplot(
-  data = items_data,
-  aes(
-    x = branch_code,
-    y = count_items_by_branch,
-    color = branch_code
+# Total Payments Card
+  value_box(
+    title = tags$span(style="font-size:0.7rem;", "Total Payments"),
+    value = tags$span(style="font-size:0.9rem;", paste0("₹ ", comma(total_payments))),
+    showcase = bs_icon("credit-card", size="1em"),
+    theme = "danger",
+    showcase_layout = "left center"
   )
-) +
-  geom_point() 
+  
 
-ggplotly(item_data_graph)
+  # Vijaya Balance Card
+  tags$div(
+  `data-bs-toggle` = "tooltip",
+  `data-bs-placement` = "right",
+  title = paste0(
+    "Opening Balance : ₹ ", comma(opening_vijaya), "\n",
+    "Net Transactions : ₹ ", comma(txn_vijaya), "\n",
+    "-------------------------\n",
+    "Closing Balance : ₹ ", comma(closing_vijaya)
+  ),
+  style = "cursor: help;",
+
+  value_box(
+    title = tags$span(style="font-size:0.7rem;", "Vijaya Balance"),
+    value = tags$span(style="font-size:0.9rem;", paste0("₹ ", comma(closing_vijaya))),
+    showcase = bs_icon("piggy-bank", size="1em"),
+    theme = "warning",
+    showcase_layout = "left center"
+  )
+)
+
+```
+
+### Column 3
+```{r}
+# cashflow data
+cashflow_df <- tibble(
+  Type = c("Collections", "Payments"),
+  Amount = c(total_collections, total_payments)
+)
+
+# To Draw ggplot
+p <- ggplot(cashflow_df, aes(x = Type, y = Amount, fill = Type)) +
+  geom_col(width = 0.5) +
+  scale_y_continuous(labels = comma) +
+  labs(title = "Collections vs Payments",
+       y = "Amount (₹)",
+       x = "") +
+  theme_minimal() +
+  theme(legend.position = "none")
+
+# Convert to ggplot to interactive plotly chart
+ggplotly(p)
 
 ```
 
 
-# React Table
+## Row
 
-## Row 
+### Column 1
+```{r}
+monthly_movement <- daybook %>%
+  filter(ledger_name %in% c(
+    "11101004 - ICICI bank-281305008509",
+    "11101002 - VIjaya Bank -100800301000084"
+  )) %>%
+  mutate(date = as.Date(date, format = "%Y-%m-%d"),
+         Month = floor_date(date, "month")) %>%
+  group_by(Month, ledger_name) %>%
+  summarise(Net = sum(net_amount), .groups = "drop") %>%
+  arrange(ledger_name, Month)   # To sort by ledger and Month
+
+# Plot using pure plotly for guaranteed lines
+plot_ly(monthly_movement, 
+        x = ~Month, 
+        y = ~Net, 
+        color = ~ledger_name, 
+        type = 'scatter', 
+        mode = 'lines+markers',
+        text = ~paste("Ledger:", ledger_name,
+                      "<br>Month:", Month,
+                      "<br>Net: ₹", scales::comma(Net)),
+        hoverinfo = 'text') %>%
+  layout(title = "Monthly Bank Movement",
+         xaxis = list(title = ""),
+         yaxis = list(title = "Net Amount (₹)"))
+```
+
+### Column 2
+```{r}
+bank_balance_df <- tibble(
+  Bank = c("ICICI", "Vijaya"),
+  Balance = c(icici_books, vijaya_books)
+)
+
+# Plotly bar chart
+plot_ly(
+  data = bank_balance_df,
+  x = ~Bank,
+  y = ~Balance,
+  type = 'bar',
+  text = ~paste0("₹", format(Balance, big.mark = ",")),  # display value on hover
+  hoverinfo = 'text',
+  marker = list(color = c('#1f77b4', '#ff7f0e'))  # optional custom colors
+) %>%
+  layout(
+    title = "Closing Balance Comparison",
+    yaxis = list(title = "Balance (₹)", tickformat = ","),
+    xaxis = list(title = ""),
+    showlegend = FALSE
+  )
+```
+
+
+
+## Row
+
+### Column 1
 
 ```{r}
-library(DT)
-
-datatable(
-  items_data,
-  options = list(
-    pageLength = 10,
-    autoWidth = TRUE,
-    dom = 'Bfrtip',
-    searching = TRUE,
-    paging = TRUE
-  ),
-  rownames = FALSE,
-  class = 'cell-border stripe hover',
-  filter = 'top'  # <-- enables column-wise filters
-) %>%
-  formatStyle(
-    names(items_data),
-    backgroundColor = 'white',
-    color = 'black'
+#This Will Get BankWise Credit And Debit Data
+bank_dc_split <- daybook %>%
+  filter(ledger_name %in% c(
+    "11101004 - ICICI bank-281305008509",
+    "11101002 -   VIjaya Bank -100800301000084"
+  )) %>%
+  summarise(
+    Credit = sum(credit_amount, na.rm = TRUE),
+    Debit  = sum(debit_amount, na.rm = TRUE),
+    .by = ledger_name
   ) %>%
-  htmltools::tagList(
-    tags$style(HTML("
-      /* Table header */
-      table.dataTable thead th {
-        background-color: white !important;
-        color: black !important;
-      }
-      table.dataTable tfoot th {
-        background-color: white !important;
-        color: black !important;
-      }
-      /* Row hover effect */
-      table.dataTable tbody tr:hover {
-        background-color: #f2f2f2 !important;
-      }
-      /* Search box */
-      .dataTables_filter input {
-        background-color: white !important;
-        color: black !important;
-      }
-      /* Page length dropdown */
-      .dataTables_length select {
-        background-color: white !important;
-        color: black !important;
-      }
-      /* Pagination buttons */
-      .dataTables_paginate .paginate_button {
-        background-color: #fbf9f9ff !important;
-        color: black !important;
-        border: 1px solid #a19e9eff !important;
-        border-radius: 3px;
-        margin: 2px;
-      }
-      .dataTables_paginate .paginate_button.current {
-        background-color: #f3eeeeff !important;
-        color: black !important;
-      }
-      .dataTables_paginate .paginate_button:hover {
-        background-color: #f1efefff !important;
-        color: black !important;
-      }
-      /* Column filter inputs */
-      table.dataTable thead input {
-        background-color: white !important;
-        color: black !important;
-        width: 100% !important;
-      }
-    "))
+  pivot_longer(
+    cols = c(Credit, Debit),
+    names_to = "Type",
+    values_to = "Amount"
   )
+
+```
+
+```{r}
+icici_dc <- bank_dc_split %>%
+  filter(ledger_name == "11101004 - ICICI bank-281305008509")
+
+plot_ly(
+  data = icici_dc,
+  labels = ~Type,
+  values = ~Amount,
+  type = "pie",
+  hole = 0.55,
+  textinfo = "label+percent",
+  hovertemplate = paste(
+    "<b>%{label}</b><br>",
+    "Amount: ₹ %{value:,}<extra></extra>"
+  )
+) %>%
+  layout(
+    title = "ICICI Bank – Debit vs Credit",
+    showlegend = TRUE
+  )
+
+```
+
+
+### Column 2
+
+```{r}
+vijaya_dc <- bank_dc_split %>%
+  filter(ledger_name == "11101002 -   VIjaya Bank -100800301000084")
+
+plot_ly(
+  data = vijaya_dc,
+  labels = ~Type,
+  values = ~Amount,
+  type = "pie",
+  hole = 0.55,
+  textinfo = "label+percent",
+  hovertemplate = paste(
+    "<b>%{label}</b><br>",
+    "Amount: ₹ %{value:,}<extra></extra>"
+  )
+) %>%
+  layout(
+    title = "Vijaya Bank – Debit vs Credit",
+    showlegend = TRUE
+  )
+
+```
+
+### Column 3 {width=50%}
+
+```{r}
+txn_movement <- daybook %>%
+  filter(ledger_name %in% c(
+    "11101004 - ICICI bank-281305008509",
+    "11101002 - VIjaya Bank -100800301000084"
+  )) %>%
+  mutate(
+    date = as.Date(date),
+    Month = floor_date(date, "month")
+  ) %>%
+  arrange(ledger_name, date)
+
+plot_ly(
+  data = txn_movement,
+  x = ~date,
+  y = ~net_amount,
+  color = ~ledger_name,
+  type = "scatter",
+  mode = "lines+markers",
+  marker = list(size = 8),
+  text = ~paste(
+    "<b>Bank:</b>", ledger_name,
+    "<br><b>Date:</b>", date,
+    "<br><b>Amount:</b> ₹", scales::comma(net_amount),
+    "<br><b>Narration:</b>", narr_short
+  ),
+  hoverinfo = "text"
+) %>%
+  layout(
+    title = "Transaction-wise Bank Movement (Each Record)",
+    xaxis = list(title = "Date"),
+    yaxis = list(title = "Transaction Amount (₹)", zeroline = TRUE)
+  )
+
+```
+
+
+
+
+## Row
+```{r}
+library(reactable)
+library(dplyr)
+library(stringr)
+library(htmltools)
+library(htmlwidgets)
+
+bank_table <- tribble(
+  ~`Bank Name`,            ~`Account No`,          ~Status,    ~`Balance as per Books`, ~`Cheque issued but not yet presented`, ~`Cheques Received but not yet deposited`, ~`Balance as per Bank`,
+  "Bank of Baroda",        "50060200000389",       "Active",    "5,076,886",             "-",                                        "-",                                        "5,076,886",
+  "ICICI Bank",            "281305008509",         "Active",    format(icici_books, big.mark=","), "-", "-", format(icici_books, big.mark=","),
+
+  "Bank of Baroda",        "100800301000131",      "Inactive",  "3,719",                  "-", "-", "Not Provided",
+
+  "State Bank of India",   "00000031065154819",    "Inactive",  "37,229",                 "-", "-", "Not Provided",
+
+  "Bank of Baroda (Vijaya)", "100800301000084",    "Inactive",   format(vijaya_books, big.mark=","), "-", "-", "Not Provided",
+
+  "Bank of Baroda OD",     "OD",                   "Inactive",  "-",                      "-", "-", "-",
+)
+
+
+bank_table_clean <- bank_table %>%
+  mutate(
+    books_num = parse_number(`Balance as per Books`),
+    bank_num  = parse_number(`Balance as per Bank`),
+    cheque_not_yet_recived_num = parse_number(`Cheque issued but not yet presented`),
+    cheque_not_yet_recived_num = parse_number(`Cheques Received but not yet deposited`)
+  )
+
+books_sum <- sum(bank_table_clean$books_num, na.rm = TRUE)
+bank_sum  <- sum(bank_table_clean$bank_num, na.rm = TRUE)
+
+reactable(
+  bank_table,
+  searchable = TRUE,
+  defaultPageSize = 10,
+  striped = TRUE,
+  bordered = TRUE,
+  wrap = FALSE,
+  elementId = "bank_reco_table",
+
+  columns = list(
+    `Bank Name` = colDef(footer = "Total Current Balance"),
+
+    `Balance as per Books` = colDef(
+      align = "right",
+      footer = paste0("₹ ", format(books_sum, big.mark = ","))
+    ),
+
+    `Balance as per Bank` = colDef(
+      align = "right",
+      footer = paste0("₹ ", format(bank_sum, big.mark = ","))
+    )
+  ),
+
+  rowStyle = JS("function(rowInfo) {
+    return { backgroundColor: '#ffffff' };
+  }"),
+
+  theme = reactableTheme(
+    headerStyle = list(
+      backgroundColor = "#DCE6F1",
+      fontWeight = "bold",
+      textAlign = "center"
+    ),
+    footerStyle = list(
+      backgroundColor = "#DCE6F1",
+      fontWeight = "bold"
+    )
+  )
+) |>
+  onRender(
+    paste0("
+      function(el) {
+
+        /* 🔹 ADD OUTER BORDER TO TABLE */
+        const table = el.querySelector('.rt-table');
+        if (table) {
+          table.style.border = '1px solid #d1d5db';
+        }
+
+        /* 🔹 ADD REPORT TITLE BELOW SEARCH */
+        const search = el.querySelector('.rt-search');
+
+        if (search && !document.getElementById('bank-report-title')) {
+
+          const title = document.createElement('div');
+          title.id = 'bank-report-title';
+          title.innerHTML = 'Bank Reconciliation Statement as on ", report_date, "';
+
+          title.style.background = '#DCE6F1';
+          title.style.padding = '10px';
+          title.style.textAlign = 'center';
+          title.style.fontWeight = 'bold';
+          title.style.fontSize = '1rem';
+          title.style.border = '1px solid #d1d5db';
+          title.style.borderBottom = 'none';
+          title.style.marginTop = '8px';
+
+          search.parentNode.insertBefore(title, search.nextSibling);
+        }
+      }
+    ")
+  )
+
+
+
+```
+
+# Collections Report
+
+```{r, results='asis'}
+ library(reactable)
+library(dplyr)
+
+collections_final <- collections %>%
+  rename(
+    Date = date,
+    `Voucher Type` = voucher_type,
+    `Party Name` = ledger_name,
+    `Bank Ref` = narr_short,
+    Amount = net_amount
+  )
+
+total_amount <- sum(collections_final$Amount, na.rm = TRUE)
+
+reactable(
+  collections_final,
+  searchable = TRUE,
+  resizable = TRUE,
+  wrap = FALSE,
+  striped = TRUE,   # keep striped but override color
+  bordered = TRUE,
+  elementId = "collections_table",
+
+  # 🔹 Pagination settings
+  defaultPageSize = 10,           # show 10 rows per page
+  showPageSizeOptions = TRUE,     # allow user to change page size
+  pageSizeOptions = c(10, 25, 50),
+
+  columns = list(
+    `Party Name` = colDef(
+      footer = "Total",
+      footerStyle = list(fontWeight = "bold")
+    ),
+
+    Amount = colDef(
+      align = "right",
+      format = colFormat(digits = 2, separators = TRUE),
+      footer = format(
+        total_amount,
+        big.mark = ",",
+        nsmall = 2
+      ),
+      footerStyle = list(
+        fontWeight = "bold",
+        textAlign = "right"
+      )
+    )
+  ),
+
+  # 🔹 Force body rows to white
+  rowStyle = JS("function(rowInfo) {
+    return {
+      backgroundColor: '#ffffff'
+    };
+  }"),
+
+  theme = reactableTheme(
+    headerStyle = list(
+      backgroundColor = '#DCE6F1',
+      color = '#111827',
+      fontWeight = 'bold',
+      textAlign = 'center'
+    ),
+    footerStyle = list(
+      backgroundColor = '#DCE6F1',
+      fontWeight = 'bold',
+      borderTop = '2px solid #111827'
+    )
+  )
+)
+
+
+```
+
+# Payment Report
+
+```{r, results='asis'}
+library(reactable)
+library(dplyr)
+
+# Total Amount for footer
+amount_total <- sum(payables$net_amount, na.rm = TRUE)
+
+# Rename columns
+payables_final <- payables %>%
+  rename(
+    Date = date,
+    `Voucher Type` = voucher_type,
+    `Bank Ref` = narr_short,
+    `Party Name` = ledger_name,
+    Amount = net_amount
+  )
+
+reactable(
+  payables_final,
+  searchable = TRUE,
+  resizable = TRUE,
+  wrap = FALSE,
+  striped = TRUE,
+  bordered = TRUE,
+  elementId = "payments_table",
+
+  # 🔹 Pagination
+  defaultPageSize = 10,
+  showPageSizeOptions = TRUE,
+  pageSizeOptions = c(10, 25, 50),
+
+  columns = list(
+    `Party Name` = colDef(
+      footer = "Total",
+      footerStyle = list(fontWeight = "bold")
+    ),
+
+    Amount = colDef(
+      align = "right",
+      format = colFormat(digits = 2, separators = TRUE),
+      footer = function() {
+        paste0("₹ ", format(amount_total, big.mark = ","))
+      },
+      footerStyle = list(
+        fontWeight = "bold",
+        textAlign = "right"
+      )
+    )
+  ),
+
+  # 🔹 White background for rows
+  rowStyle = JS("function(rowInfo) {
+    return { backgroundColor: '#ffffff' };
+  }"),
+
+  theme = reactableTheme(
+    headerStyle = list(
+      backgroundColor = "#DCE6F1",
+      color = "#111827",
+      fontWeight = "bold",
+      textAlign = "center"
+    ),
+    footerStyle = list(
+      backgroundColor = "#DCE6F1",
+      borderTop = "2px solid #111827"
+    ),
+    stripedColor = "#ffffff"
+  )
+)
+
 
 ```
 
 </div>
+
+
+
+
+
 
 
 
