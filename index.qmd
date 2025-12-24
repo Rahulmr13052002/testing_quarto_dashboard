@@ -1,6 +1,5 @@
 ---
 title: "Bank Reconciliation Report"
-author: "Shwetha Ragothaman"
 date: today()
 
 format:
