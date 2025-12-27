@@ -44,6 +44,7 @@ library(scales)
 library(htmltools)
 library(ggplot2)
 library(plotly)
+library(echarts4r)
 ```
 
 ```{r}
@@ -126,34 +127,30 @@ vijaya_books <- daybook |>
 
 ## Row
 ```{r}
-# Sample calculations
+
 total_collections <- sum(collections$net_amount, na.rm = TRUE) * -1
 total_payments    <- sum(payables$net_amount, na.rm = TRUE)
-# Closing balances including all transactions
 
-#For ICICI Opening Balance
+
 opening_icici <- params$opg_bal_icici
 
-#This For ICICI Bank Transaction sum
 txn_icici <- daybook |>
   filter(ledger_name == "11101004 - ICICI bank-281305008509") |>
   summarise(total = sum(net_amount, na.rm = TRUE)) |>
   pull(total)
 
-# Final ICIC Closing Balance
+
 closing_icici <- opening_icici + txn_icici
 
 
-#For Vijaya Opening Balance
 opening_vijaya <- params$opg_bal_vijaya
 
-#This For Vijaya Bank Transaction sum
 txn_vijaya <- daybook |>
   filter(ledger_name == "11101002 -   VIjaya Bank -100800301000084") |>
   summarise(total = sum(net_amount, na.rm = TRUE)) |>
   pull(total)
 
-# Final Vijaya Closing Balance
+
 closing_vijaya <- opening_vijaya + txn_vijaya
 
 ```
@@ -163,16 +160,15 @@ closing_vijaya <- opening_vijaya + txn_vijaya
 ### Column 1
 
 ```{r}
-# Total Collections Card
-  value_box(
-    title = tags$span(style="font-size:0.7rem;", "Total Collections"),
-    value = tags$span(style="font-size:0.9rem;", paste0("₹ ", comma(total_collections))),
-    showcase = bs_icon("cash-stack", size="1em"),
-    theme = "primary",
-    showcase_layout = "left center"
-  )
 
-  # ICICI Balance Card
+  value_box(
+  title = tags$span(style="font-size:0.7rem;", "Total Collections"),
+  value = tags$span(style="font-size:0.9rem;", paste0("₹ ", comma(total_collections))),
+  showcase = bs_icon("cash-stack", size="1em"),
+  style = "background-color: #89c7a1; color: #61615f; border-radius:0.5rem;",
+  showcase_layout = "left center"
+)
+
   tags$div(
   `data-bs-toggle` = "tooltip",
   `data-bs-placement` = "right",
@@ -188,7 +184,7 @@ closing_vijaya <- opening_vijaya + txn_vijaya
     title = tags$span(style="font-size:0.7rem;", "ICICI Balance"),
     value = tags$span(style="font-size:0.9rem;", paste0("₹ ", comma(icici_books))),
     showcase = bs_icon("bank", size="1em"),
-    theme = "success",
+    style = "background-color: #6395d6; color: #61615f; border-radius:0.5rem;",
     showcase_layout = "left center"
   )
 )
@@ -203,7 +199,7 @@ closing_vijaya <- opening_vijaya + txn_vijaya
     title = tags$span(style="font-size:0.7rem;", "Total Payments"),
     value = tags$span(style="font-size:0.9rem;", paste0("₹ ", comma(total_payments))),
     showcase = bs_icon("credit-card", size="1em"),
-    theme = "danger",
+    style = "background-color: #e68273; color: #61615f; border-radius:0.5rem;",
     showcase_layout = "left center"
   )
   
@@ -224,7 +220,7 @@ closing_vijaya <- opening_vijaya + txn_vijaya
     title = tags$span(style="font-size:0.7rem;", "Vijaya Balance"),
     value = tags$span(style="font-size:0.9rem;", paste0("₹ ", comma(closing_vijaya))),
     showcase = bs_icon("piggy-bank", size="1em"),
-    theme = "warning",
+    style = "background-color: #dfe378; color: #61615f; border-radius:0.5rem;",
     showcase_layout = "left center"
   )
 )
@@ -233,24 +229,52 @@ closing_vijaya <- opening_vijaya + txn_vijaya
 
 ### Column 3
 ```{r}
-# cashflow data
 cashflow_df <- tibble(
   Type = c("Collections", "Payments"),
   Amount = c(total_collections, total_payments)
 )
 
-# To Draw ggplot
-p <- ggplot(cashflow_df, aes(x = Type, y = Amount, fill = Type)) +
-  geom_col(width = 0.5) +
-  scale_y_continuous(labels = comma) +
-  labs(title = "Collections vs Payments",
-       y = "Amount (₹)",
-       x = "") +
-  theme_minimal() +
-  theme(legend.position = "none")
+cashflow_df$Amount <- as.numeric(cashflow_df$Amount)
 
-# Convert to ggplot to interactive plotly chart
-ggplotly(p)
+cashflow_df |>
+  e_charts(Type) |>
+  e_bar(
+    Amount,
+    width = "50%",
+    itemStyle = list(
+      color = htmlwidgets::JS(
+        "function(params){
+           return params.name === 'Collections'
+           ? '#89c7a1'
+           : '#e68273';
+         }"
+      )
+    )
+  ) |>
+  e_title("Collections vs Payments") |>
+  e_y_axis(
+    name = "Amount (₹)",
+    axisLabel = list(
+      formatter = htmlwidgets::JS(
+        "function(value){
+           return value.toLocaleString();
+         }"
+      )
+    )
+  ) |>
+  e_tooltip(
+    trigger = "axis",
+    formatter = htmlwidgets::JS(
+      "function(params){
+         return params[0].name + ': ₹' +
+                params[0].value.toLocaleString();
+       }"
+    )
+  ) |>
+  e_legend(FALSE) |> 
+  e_grid(left = 60, right = 30, top = 60, bottom = 40)|> e_animation(duration = 800)
+
+
 
 ```
 
@@ -259,56 +283,135 @@ ggplotly(p)
 
 ### Column 1
 ```{r}
+
 monthly_movement <- daybook %>%
   filter(ledger_name %in% c(
     "11101004 - ICICI bank-281305008509",
     "11101002 - VIjaya Bank -100800301000084"
   )) %>%
-  mutate(date = as.Date(date, format = "%Y-%m-%d"),
-         Month = floor_date(date, "month")) %>%
+  mutate(
+    date = as.Date(date, format = "%Y-%m-%d"),
+    Month = floor_date(date, "month")
+  ) %>%
   group_by(Month, ledger_name) %>%
   summarise(Net = sum(net_amount), .groups = "drop") %>%
-  arrange(ledger_name, Month)   # To sort by ledger and Month
+  arrange(ledger_name, Month)
 
-# Plot using pure plotly for guaranteed lines
-plot_ly(monthly_movement, 
-        x = ~Month, 
-        y = ~Net, 
-        color = ~ledger_name, 
-        type = 'scatter', 
-        mode = 'lines+markers',
-        text = ~paste("Ledger:", ledger_name,
-                      "<br>Month:", Month,
-                      "<br>Net: ₹", scales::comma(Net)),
-        hoverinfo = 'text') %>%
-  layout(title = "Monthly Bank Movement",
-         xaxis = list(title = ""),
-         yaxis = list(title = "Net Amount (₹)"))
+monthly_movement$Net <- as.numeric(monthly_movement$Net)
+
+# Color mapping for each ledger
+color_map <- c("11101004 - ICICI bank-281305008509" = "#a6dca1ff",   # ICICI blue
+               "11101002 - VIjaya Bank -100800301000084" = "#ff7f0e") # Vijaya orange
+
+# Generate the line chart with custom colors
+monthly_movement %>%
+  group_by(ledger_name) %>%
+  e_charts(Month) %>%
+  e_line(
+    Net,
+    symbol = "circle",
+    symbolSize = 8,
+    itemStyle = list(
+      color = htmlwidgets::JS(
+        "function(params) {
+           // Use the color_map to assign colors based on ledger_name
+           var colorMap = {'11101004 - ICICI bank-281305008509': '#27ab1eff', 
+                           '11101002 - VIjaya Bank -100800301000084': '#ff7f0e'};
+           return colorMap[params.name] || '#888';  // Fallback color
+         }"
+      )
+    )
+  ) %>%
+  e_title("Monthly Bank Movement") %>%
+  e_y_axis(
+    name = "Net Amount (₹)",
+    axisLabel = list(
+      formatter = htmlwidgets::JS(
+        "function(value){
+           return value.toLocaleString('en-IN');
+         }"
+      )
+    )
+  ) %>%
+  e_tooltip(
+    trigger = "axis",
+    formatter = htmlwidgets::JS(
+      "function(params){
+         var txt = '';
+         params.forEach(function(p){
+           var month = new Date(p.value[0])
+             .toLocaleDateString('en-IN', { month: 'short', year: 'numeric' });
+           var net = p.value[1].toLocaleString('en-IN');
+           txt += '<b>Ledger:</b> ' + p.seriesName +
+                  '<br><b>Month:</b> ' + month +
+                  '<br><b>Net:</b> ₹' + net +
+                  '<br><br>';
+         });
+         return txt;
+       }"
+    )
+  ) %>%
+  e_legend(TRUE)
+
+
 ```
 
 ### Column 2
 ```{r}
+
 bank_balance_df <- tibble(
   Bank = c("ICICI", "Vijaya"),
   Balance = c(icici_books, vijaya_books)
 )
 
-# Plotly bar chart
-plot_ly(
-  data = bank_balance_df,
-  x = ~Bank,
-  y = ~Balance,
-  type = 'bar',
-  text = ~paste0("₹", format(Balance, big.mark = ",")),  # display value on hover
-  hoverinfo = 'text',
-  marker = list(color = c('#1f77b4', '#ff7f0e'))  # optional custom colors
-) %>%
-  layout(
-    title = "Closing Balance Comparison",
-    yaxis = list(title = "Balance (₹)", tickformat = ","),
-    xaxis = list(title = ""),
-    showlegend = FALSE
+bank_balance_df$Balance <- as.numeric(bank_balance_df$Balance)
+
+bank_balance_df %>%
+  e_charts(Bank) %>%
+  e_bar(
+    Balance,
+    itemStyle = list(
+      color = htmlwidgets::JS(
+        "function(params){
+           return params.name === 'ICICI'
+           ? '#6395d6'
+           : '#dfe378';
+         }"
+      )
+    )
+  ) %>%
+  e_title("Closing Balance Comparison") %>%
+  e_y_axis(
+    name = "Balance (₹)",
+    axisLabel = list(
+      formatter = htmlwidgets::JS(
+        "function(value){
+           return value.toLocaleString('en-IN');
+         }"
+      )
+    )
+  ) %>%
+  e_tooltip(
+  trigger = "item",
+  formatter = htmlwidgets::JS(
+    "function(p){
+       return `
+         <table style='width:100%; font-size:12px'>
+           <tr>
+             <td style='padding-right:10px;'><b>Bank</b></td>
+             <td style='text-align:right;'>${p.name}</td>
+           </tr>
+           <tr>
+             <td><b>Balance</b></td>
+             <td style='text-align:right;'>₹${p.value.toLocaleString('en-IN')}</td>
+           </tr>
+         </table>
+       `;
+     }"
   )
+) %>%
+  e_legend(FALSE)
+
 ```
 
 
@@ -338,25 +441,32 @@ bank_dc_split <- daybook %>%
 ```
 
 ```{r}
+library(dplyr)
+library(echarts4r)
+
 icici_dc <- bank_dc_split %>%
   filter(ledger_name == "11101004 - ICICI bank-281305008509")
 
-plot_ly(
-  data = icici_dc,
-  labels = ~Type,
-  values = ~Amount,
-  type = "pie",
-  hole = 0.55,
-  textinfo = "label+percent",
-  hovertemplate = paste(
-    "<b>%{label}</b><br>",
-    "Amount: ₹ %{value:,}<extra></extra>"
-  )
-) %>%
-  layout(
-    title = "ICICI Bank – Debit vs Credit",
-    showlegend = TRUE
-  )
+icici_dc %>%
+  e_charts(Type) %>%
+  e_pie(
+    Amount,
+    radius = c("55%", "75%"),   # donut shape
+    label = list(
+      formatter = "{b}: {d}%"   # label + percent
+    )
+  ) %>%
+  e_tooltip(
+    trigger = "item",
+    formatter = htmlwidgets::JS(
+      "function(params) {
+         return '<b>' + params.name + '</b><br/>' +
+                'Amount: ₹ ' + params.value.toLocaleString();
+       }"
+    )
+  ) %>%
+  e_title("ICICI Bank – Debit vs Credit") %>%
+  e_legend(right = "5%")
 
 ```
 
@@ -364,31 +474,46 @@ plot_ly(
 ### Column 2
 
 ```{r}
-vijaya_dc <- bank_dc_split %>%
-  filter(ledger_name == "11101002 -   VIjaya Bank -100800301000084")
+library(dplyr)
+library(echarts4r)
 
-plot_ly(
-  data = vijaya_dc,
-  labels = ~Type,
-  values = ~Amount,
-  type = "pie",
-  hole = 0.55,
-  textinfo = "label+percent",
-  hovertemplate = paste(
-    "<b>%{label}</b><br>",
-    "Amount: ₹ %{value:,}<extra></extra>"
+vijaya_dc <- bank_dc_split %>%
+  filter(ledger_name == "11101002 -   VIjaya Bank -100800301000084") %>%
+  transmute(
+    name  = Type,     # REQUIRED by ECharts
+    value = Amount    # REQUIRED by ECharts
   )
-) %>%
-  layout(
-    title = "Vijaya Bank – Debit vs Credit",
-    showlegend = TRUE
-  )
+
+e_charts() %>%
+  e_pie(
+    vijaya_dc,
+    name = "Debit vs Credit",
+    radius = c("55%", "75%"),
+    label = list(
+      formatter = "{b}: {d}%"
+    )
+  ) %>%
+  e_tooltip(
+    formatter = htmlwidgets::JS(
+      "function(params) {
+         return '<b>' + params.name + '</b><br/>' +
+                'Amount: ₹ ' + params.value.toLocaleString();
+       }"
+    )
+  ) %>%
+  e_title("Vijaya Bank – Debit vs Credit") %>%
+  e_legend(show = TRUE)
 
 ```
 
 ### Column 3 {width=50%}
 
 ```{r}
+library(dplyr)
+library(lubridate)
+library(echarts4r)
+library(scales)
+
 txn_movement <- daybook %>%
   filter(ledger_name %in% c(
     "11101004 - ICICI bank-281305008509",
@@ -400,27 +525,35 @@ txn_movement <- daybook %>%
   ) %>%
   arrange(ledger_name, date)
 
-plot_ly(
-  data = txn_movement,
-  x = ~date,
-  y = ~net_amount,
-  color = ~ledger_name,
-  type = "scatter",
-  mode = "lines+markers",
-  marker = list(size = 8),
-  text = ~paste(
-    "<b>Bank:</b>", ledger_name,
-    "<br><b>Date:</b>", date,
-    "<br><b>Amount:</b> ₹", scales::comma(net_amount),
-    "<br><b>Narration:</b>", narr_short
-  ),
-  hoverinfo = "text"
-) %>%
-  layout(
-    title = "Transaction-wise Bank Movement (Each Record)",
-    xaxis = list(title = "Date"),
-    yaxis = list(title = "Transaction Amount (₹)", zeroline = TRUE)
-  )
+# echarts4r plot: one line per bank using group_by()
+txn_movement %>%
+  group_by(ledger_name) %>%         # group by bank
+  e_charts(date) %>%
+  e_line(
+    net_amount,
+    symbol = "circle",
+    symbol_size = 8,
+    smooth = FALSE
+  ) %>%
+  e_tooltip(
+    trigger = "item",
+    formatter = htmlwidgets::JS(
+      "function(params) {
+         return '<b>Bank:</b> ' + params.seriesName + '<br/>' +
+                '<b>Date:</b> ' + params.value[0] + '<br/>' +
+                '<b>Amount:</b> ₹ ' + params.value[1].toLocaleString();
+       }"
+    )
+  ) %>%
+  e_title("Transaction-wise Bank Movement (Each Record)") %>%
+  e_x_axis(name = "Date") %>%
+  e_y_axis(
+    name = "Transaction Amount (₹)",
+    axisLabel = list(formatter = JS("function(val){return val.toLocaleString();}")),
+    zeroline = TRUE
+  ) %>%
+  e_legend(right = "5%")
+
 
 ```
 
