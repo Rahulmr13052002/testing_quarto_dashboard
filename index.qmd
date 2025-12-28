@@ -155,9 +155,7 @@ closing_vijaya <- opening_vijaya + txn_vijaya
 
 ```
 
-## Row
-
-### Column 1
+## Row {height="160px"}
 
 ```{r}
 
@@ -168,7 +166,21 @@ closing_vijaya <- opening_vijaya + txn_vijaya
   style = "background-color: #89c7a1; color: #61615f; border-radius:0.5rem;",
   showcase_layout = "left center"
 )
+```
 
+```{r}
+# Total Payments Card
+  value_box(
+    title = tags$span(style="font-size:0.7rem;", "Total Payments"),
+    value = tags$span(style="font-size:0.9rem;", paste0("₹ ", comma(total_payments))),
+    showcase = bs_icon("credit-card", size="1em"),
+    style = "background-color: #e68273; color: #61615f; border-radius:0.5rem;",
+    showcase_layout = "left center"
+  )
+
+```
+
+```{r}
   tags$div(
   `data-bs-toggle` = "tooltip",
   `data-bs-placement` = "right",
@@ -191,20 +203,9 @@ closing_vijaya <- opening_vijaya + txn_vijaya
 
 ```
 
-### Column 2
-
 ```{r}
-# Total Payments Card
-  value_box(
-    title = tags$span(style="font-size:0.7rem;", "Total Payments"),
-    value = tags$span(style="font-size:0.9rem;", paste0("₹ ", comma(total_payments))),
-    showcase = bs_icon("credit-card", size="1em"),
-    style = "background-color: #e68273; color: #61615f; border-radius:0.5rem;",
-    showcase_layout = "left center"
-  )
-  
 
-  # Vijaya Balance Card
+# Vijaya Balance Card
   tags$div(
   `data-bs-toggle` = "tooltip",
   `data-bs-placement` = "right",
@@ -227,7 +228,10 @@ closing_vijaya <- opening_vijaya + txn_vijaya
 
 ```
 
-### Column 3
+## Row {height="400px"}
+
+### Column 1
+
 ```{r}
 cashflow_df <- tibble(
   Type = c("Collections", "Payments"),
@@ -278,10 +282,8 @@ cashflow_df |>
 
 ```
 
+### Column 2
 
-## Row
-
-### Column 1
 ```{r}
 
 monthly_movement <- daybook %>%
@@ -356,7 +358,8 @@ monthly_movement %>%
 
 ```
 
-### Column 2
+### Column 3
+
 ```{r}
 
 bank_balance_df <- tibble(
@@ -414,9 +417,7 @@ bank_balance_df %>%
 
 ```
 
-
-
-## Row
+## Row {height="400px"}
 
 ### Column 1
 
@@ -470,7 +471,6 @@ icici_dc %>%
 
 ```
 
-
 ### Column 2
 
 ```{r}
@@ -506,7 +506,9 @@ e_charts() %>%
 
 ```
 
-### Column 3 {width=50%}
+## Row {height="500px"}
+
+### Column 1
 
 ```{r}
 library(dplyr)
@@ -556,9 +558,6 @@ txn_movement %>%
 
 
 ```
-
-
-
 
 ## Row
 ```{r}
@@ -648,7 +647,7 @@ bank_table_display <- bank_table_num %>%
 
 reactable(
   bank_table_display,
-  searchable = TRUE,
+  searchable = FALSE,
   defaultPageSize = 10,
   striped = TRUE,
   bordered = TRUE,
@@ -748,7 +747,7 @@ total_amount <- sum(collections_final$Amount, na.rm = TRUE)
 
 reactable(
   collections_final,
-  searchable = TRUE,
+  searchable = FALSE,
   resizable = TRUE,
   wrap = FALSE,
   striped = TRUE,
@@ -866,7 +865,7 @@ amount_total <- sum(payables_final$Amount, na.rm = TRUE)
 
 reactable(
   payables_final,
-  searchable = TRUE,
+  searchable = FALSE,
   resizable = TRUE,
   wrap = FALSE,
   striped = TRUE,
