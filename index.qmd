@@ -241,10 +241,10 @@ cashflow_df <- tibble(
 cashflow_df$Amount <- as.numeric(cashflow_df$Amount)
 
 cashflow_df |>
-  e_charts(Type) |>
+  e_charts(Type, height = "100%") |>
   e_bar(
     Amount,
-    width = "50%",
+    barWidth = "40%",
     itemStyle = list(
       color = htmlwidgets::JS(
         "function(params){
@@ -255,30 +255,55 @@ cashflow_df |>
       )
     )
   ) |>
-  e_title("Collections vs Payments") |>
+  e_title(
+    "Collections vs Payments",
+    left = "center",
+    top = 8,
+    textStyle = list(fontSize = 14)
+  ) |>
   e_y_axis(
     name = "Amount (₹)",
+    nameLocation = "middle",
+    nameGap = 45,
     axisLabel = list(
       formatter = htmlwidgets::JS(
         "function(value){
-           return value.toLocaleString();
-         }"
+          if (Math.abs(value) >= 10000000) {
+            return (value / 10000000) + 'Cr';
+          } else if (Math.abs(value) >= 100000) {
+            return (value / 100000) + 'L';
+          } else if (Math.abs(value) >= 1000) {
+            return (value / 1000) + 'K';
+          } else {
+            return value;
+          }
+        }"
       )
     )
   ) |>
+  e_grid(
+    left = 80,
+    right = 30,
+    top = 70,
+    bottom = 50
+  ) |>
   e_tooltip(
-    trigger = "axis",
+    trigger = "item",
+    confine = TRUE,
     formatter = htmlwidgets::JS(
-      "function(params){
-         return params[0].name + ': ₹' +
-                params[0].value.toLocaleString();
+      "function(p){
+         var amount = Number(p.value[1]); 
+
+         return `
+           <div style='font-size:12px; line-height:1.5'>
+             <div><b>Label :</b> ${p.name}</div>
+             <div><b>Amount :</b> ₹ ${amount.toLocaleString('en-IN')}</div>
+           </div>
+         `;
        }"
     )
   ) |>
-  e_legend(FALSE) |> 
-  e_grid(left = 60, right = 30, top = 60, bottom = 40)|> e_animation(duration = 800)
-
-
+  e_legend(FALSE)
 
 ```
 
@@ -308,52 +333,71 @@ color_map <- c("11101004 - ICICI bank-281305008509" = "#a6dca1ff",   # ICICI blu
 # Generate the line chart with custom colors
 monthly_movement %>%
   group_by(ledger_name) %>%
-  e_charts(Month) %>%
+  e_charts(Month, height = "100%") %>%
   e_line(
     Net,
     symbol = "circle",
-    symbolSize = 8,
-    itemStyle = list(
-      color = htmlwidgets::JS(
-        "function(params) {
-           // Use the color_map to assign colors based on ledger_name
-           var colorMap = {'11101004 - ICICI bank-281305008509': '#27ab1eff', 
-                           '11101002 - VIjaya Bank -100800301000084': '#ff7f0e'};
-           return colorMap[params.name] || '#888';  // Fallback color
-         }"
-      )
-    )
+    symbolSize = 6
   ) %>%
-  e_title("Monthly Bank Movement") %>%
+  e_title(
+    "Monthly Bank Movement",
+    left = "center",
+    top = 8,
+    textStyle = list(fontSize = 14)
+  ) %>%
   e_y_axis(
     name = "Net Amount (₹)",
+    nameLocation = "middle",
+    nameGap = 50,
     axisLabel = list(
       formatter = htmlwidgets::JS(
         "function(value){
-           return value.toLocaleString('en-IN');
-         }"
+          var sign = value < 0 ? '-' : '';
+          var absVal = Math.abs(value);
+
+          if (absVal >= 10000000) {
+            return sign + (absVal / 10000000) + 'Cr';
+          } else if (absVal >= 100000) {
+            return sign + (absVal / 100000) + 'L';
+          } else if (absVal >= 1000) {
+            return sign + (absVal / 1000) + 'K';
+          } else {
+            return sign + absVal;
+          }
+        }"
       )
     )
   ) %>%
+  e_grid(
+    left = 80,
+    right = 30,
+    top = 65,
+    bottom = 70
+  ) %>%
+  e_legend(
+    bottom = 10,
+    itemWidth = 12,
+    itemHeight = 8,
+    textStyle = list(fontSize = 11)
+  ) %>%
   e_tooltip(
     trigger = "axis",
+    confine = TRUE,
     formatter = htmlwidgets::JS(
       "function(params){
-         var txt = '';
-         params.forEach(function(p){
-           var month = new Date(p.value[0])
-             .toLocaleDateString('en-IN', { month: 'short', year: 'numeric' });
-           var net = p.value[1].toLocaleString('en-IN');
-           txt += '<b>Ledger:</b> ' + p.seriesName +
-                  '<br><b>Month:</b> ' + month +
-                  '<br><b>Net:</b> ₹' + net +
-                  '<br><br>';
-         });
-         return txt;
-       }"
+        var txt = '';
+        params.forEach(function(p){
+          var month = new Date(p.value[0])
+            .toLocaleDateString('en-IN', { month: 'short', year: 'numeric' });
+          txt += '<b>' + p.seriesName + '</b><br>' +
+                 'Month: ' + month + '<br>' +
+                 'Net: ₹' + p.value[1].toLocaleString('en-IN') + '<br><br>';
+        });
+        return txt;
+      }"
     )
-  ) %>%
-  e_legend(TRUE)
+  )
+
 
 
 ```
@@ -370,9 +414,10 @@ bank_balance_df <- tibble(
 bank_balance_df$Balance <- as.numeric(bank_balance_df$Balance)
 
 bank_balance_df %>%
-  e_charts(Bank) %>%
+  e_charts(Bank, height = "100%") %>%
   e_bar(
     Balance,
+    barWidth = "40%",
     itemStyle = list(
       color = htmlwidgets::JS(
         "function(params){
@@ -383,37 +428,54 @@ bank_balance_df %>%
       )
     )
   ) %>%
-  e_title("Closing Balance Comparison") %>%
+  e_title(
+    "Closing Balance Comparison",
+    left = "center",
+    top = 8,
+    textStyle = list(fontSize = 14)
+  ) %>%
   e_y_axis(
     name = "Balance (₹)",
+    nameLocation = "middle",
+    nameGap = 45,
     axisLabel = list(
       formatter = htmlwidgets::JS(
         "function(value){
-           return value.toLocaleString('en-IN');
-         }"
+          var v = Math.abs(value);
+          if (v >= 10000000) return (value / 10000000).toFixed(1) + 'Cr';
+          if (v >= 100000)   return (value / 100000).toFixed(1) + 'L';
+          if (v >= 1000)     return (value / 1000).toFixed(1) + 'K';
+          return value;
+        }"
       )
     )
   ) %>%
+  e_grid(
+    left = 75,
+    right = 30,
+    top = 65,
+    bottom = 50
+  ) %>%
   e_tooltip(
-  trigger = "item",
-  formatter = htmlwidgets::JS(
-    "function(p){
-       return `
-         <table style='width:100%; font-size:12px'>
-           <tr>
-             <td style='padding-right:10px;'><b>Bank</b></td>
-             <td style='text-align:right;'>${p.name}</td>
-           </tr>
-           <tr>
-             <td><b>Balance</b></td>
-             <td style='text-align:right;'>₹${p.value.toLocaleString('en-IN')}</td>
-           </tr>
-         </table>
-       `;
-     }"
-  )
-) %>%
+    trigger = "item",
+    confine = TRUE,
+    formatter = htmlwidgets::JS(
+      "function(p){
+        var amount = Number(p.value[1]);   // ✅ CRITICAL FIX
+
+        return `
+          <div style='font-size:12px; line-height:1.6'>
+            <div><b>Bank :</b> ${p.name}</div>
+            <div><b>Balance :</b> ₹ ${amount.toLocaleString('en-IN')}</div>
+          </div>
+        `;
+      }"
+    )
+  ) %>%
   e_legend(FALSE)
+
+
+
 
 ```
 
@@ -527,36 +589,70 @@ txn_movement <- daybook %>%
   ) %>%
   arrange(ledger_name, date)
 
-# echarts4r plot: one line per bank using group_by()
 txn_movement %>%
-  group_by(ledger_name) %>%         # group by bank
-  e_charts(date) %>%
+  group_by(ledger_name) %>%
+  e_charts(date, height = "100%") %>%
   e_line(
     net_amount,
     symbol = "circle",
-    symbol_size = 8,
+    symbolSize = 6,
     smooth = FALSE
+  ) %>%
+  e_title(
+    "Transaction-wise Bank Movement (Each Record)",
+    left = "center",
+    top = 10,
+    textStyle = list(fontSize = 14)
+  ) %>%
+  e_x_axis(
+    name = "Date",
+    nameGap = 30
+  ) %>%
+  e_y_axis(
+    name = "Transaction Amount (₹)",
+    nameLocation = "middle",
+    nameGap = 55,
+    axisLabel = list(
+      formatter = htmlwidgets::JS(
+        "function(value){
+          var sign = value < 0 ? '-' : '';
+          var absVal = Math.abs(value);
+
+          if (absVal >= 10000000) {
+            return sign + (absVal / 10000000) + 'Cr';
+          } else if (absVal >= 100000) {
+            return sign + (absVal / 100000) + 'L';
+          } else if (absVal >= 1000) {
+            return sign + (absVal / 1000) + 'K';
+          } else {
+            return sign + absVal;
+          }
+        }"
+      )
+    )
+  ) %>%
+  e_grid(
+    left = 85,
+    right = 40,
+    top = 70,
+    bottom = 60
   ) %>%
   e_tooltip(
     trigger = "item",
+    confine = TRUE,
     formatter = htmlwidgets::JS(
-      "function(params) {
-         return '<b>Bank:</b> ' + params.seriesName + '<br/>' +
-                '<b>Date:</b> ' + params.value[0] + '<br/>' +
-                '<b>Amount:</b> ₹ ' + params.value[1].toLocaleString();
-       }"
+      "function(p){
+        return '<b>Bank:</b> ' + p.seriesName +
+               '<br><b>Date:</b> ' + p.value[0] +
+               '<br><b>Amount:</b> ₹ ' +
+               p.value[1].toLocaleString('en-IN');
+      }"
     )
   ) %>%
-  e_title("Transaction-wise Bank Movement (Each Record)") %>%
-  e_x_axis(name = "Date") %>%
-  e_y_axis(
-    name = "Transaction Amount (₹)",
-    axisLabel = list(formatter = JS("function(val){return val.toLocaleString();}")),
-    zeroline = TRUE
-  ) %>%
-  e_legend(right = "5%")
-
-
+  e_legend(
+    bottom = 10,
+    textStyle = list(fontSize = 11)
+  )
 ```
 
 ## Row
